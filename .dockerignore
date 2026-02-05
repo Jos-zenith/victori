@@ -1,3 +1,4 @@
+# Docker build ignore patterns
 node_modules/
 .git/
 .github/
@@ -13,9 +14,8 @@ __pycache__/
 .env.*.local
 victori/data_test/
 victori/data/
-victori/functions/data_test/
-victori/functions/data/
 victori/public/
 victori/src/
 victori/node_modules/
 .DS_Store
+*.md
