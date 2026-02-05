@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd victori && npx vite build",
+  "outputDirectory": "victori/dist",
+  "installCommand": "pnpm install && cd victori && pnpm install",
+  "framework": "vite"
+}
