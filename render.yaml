@@ -1,0 +1,20 @@
+services:
+  # Flask ML Inference Server
+  - type: web
+    name: victori-inference-server
+    runtime: python
+    plan: free
+    buildCommand: pip install -r victori/functions/requirements_inference.txt
+    startCommand: python victori/functions/inference_server.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: MODEL_PATH
+        sync: false
+        # Path to model file - uses auto-detection from config_paths.py
+    healthCheckPath: /health
+    autoDeploy: true
