@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd victori && npm install --legacy-peer-deps",
+  "buildCommand": "cd victori && npx vite build",
+  "outputDirectory": "victori/dist",
+  "framework": "vite"
+}
