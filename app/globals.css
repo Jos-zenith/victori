@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Emerald color system - Primary */
+  --emerald-50: 240 253 250;
+  --emerald-100: 204 250 241;
+  --emerald-200: 167 243 208;
+  --emerald-300: 110 231 183;
+  --emerald-400: 52 211 153;
+  --emerald-500: 16 185 129;
+  --emerald-600: 5 150 105;
+  --emerald-700: 4 120 87;
+  --emerald-800: 6 95 70;
+  --emerald-900: 6 78 59;
+
+  /* Semantic tokens */
+  --background: 248 250 252;
+  --foreground: 15 23 42;
+  --card: 255 255 255;
+  --card-foreground: 15 23 42;
+  --primary: 5 150 105;
+  --primary-foreground: 240 253 250;
+  --secondary: 226 232 240;
+  --secondary-foreground: 30 41 59;
+  --muted: 148 163 184;
+  --muted-foreground: 71 85 105;
+  --accent: 34 197 94;
+  --accent-foreground: 248 250 252;
+  --destructive: 239 68 68;
+  --destructive-foreground: 248 250 252;
+  --border: 226 232 240;
+  --input: 226 232 240;
+  --ring: 5 150 105;
+  --chart-1: 5 150 105;
+  --chart-2: 59 130 246;
+  --chart-3: 249 115 22;
+  --chart-4: 236 72 153;
+  --chart-5: 168 85 247;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+  h2 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  h3 {
+    @apply text-xl font-semibold;
+  }
+  p {
+    @apply text-sm text-muted-foreground;
+  }
+}
