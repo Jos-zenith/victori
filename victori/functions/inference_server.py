@@ -1,5 +1,5 @@
 """
-Flask-based Inference Server for VGG16 Tree Identifier
+Flask-based Inference Server for Tree Identifier
 Runs on local machine or free tier services (Replit, Railway, Render)
 Spark Plan compatible - no Firebase Cloud Functions needed
 """
@@ -13,12 +13,17 @@ import io
 import logging
 from typing import Dict, Any
 import urllib.request
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)  # Enable cross-origin requests
+
+# Production settings
+FLASK_ENV = os.getenv('FLASK_ENV', 'development')
+PORT = int(os.getenv('PORT', 5000))
 
 
 class TreeIdentifier:
@@ -191,10 +196,11 @@ def get_classes():
 
 
 if __name__ == '__main__':
-    # Run on localhost:5000
+    # Run server
+    debug_mode = FLASK_ENV == 'development'
     app.run(
         host='0.0.0.0',
-        port=5000,
-        debug=False,
+        port=PORT,
+        debug=debug_mode,
         threaded=True
     )

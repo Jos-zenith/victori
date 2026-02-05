@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional, cast
 import logging
 import json
+import os
+import requests
 from pydantic import BaseModel, ValidationError, Field
 
 # Initialize Firebase Admin
@@ -26,6 +28,10 @@ logger = logging.getLogger(__name__)
 # Global configuration
 set_global_options = options.set_global_options
 set_global_options(max_instances=10, memory=512)
+
+# Flask Inference Server Configuration
+INFERENCE_SERVER_URL = os.getenv('INFERENCE_SERVER_URL', 'http://localhost:5000')
+INFERENCE_ENABLED = os.getenv('INFERENCE_ENABLED', 'true').lower() == 'true'
 
 # ==================== DATA MODELS ====================
 
@@ -136,6 +142,60 @@ def calculate_daily_carbon_contribution(
     except Exception as e:
         logger.error(f"Carbon calculation error: {str(e)}")
         return 0.0
+
+# ==================== ML INFERENCE (Flask Integration) ====================
+
+def identify_tree_species(image_url: str) -> Dict[str, Any]:
+    """
+    Calls Flask inference server to identify tree species from image
+    
+    Args:
+        image_url: URL of the tree image
+    
+    Returns:
+        {
+            "success": bool,
+            "species": str,
+            "confidence": float,
+            "class_id": int,
+            "carbon_rate_kg_per_month": float,
+            "error": str (if failed)
+        }
+    """
+    if not INFERENCE_ENABLED:
+        logger.info("ML inference disabled")
+        return {
+            "success": False,
+            "error": "ML inference not enabled"
+        }
+    
+    try:
+        logger.info(f"Calling Flask inference server at {INFERENCE_SERVER_URL}")
+        
+        response = requests.post(
+            f"{INFERENCE_SERVER_URL}/identify",
+            json={"image_url": image_url},
+            timeout=60
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        logger.info(f"Inference result: {result.get('species')} ({result.get('confidence'):.2%})")
+        
+        return result
+    
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Inference server error: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Inference failed: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Unexpected error during inference: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 # ==================== CLOUD FUNCTIONS ====================
 
