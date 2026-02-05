@@ -6,9 +6,10 @@ Handles sensor data reception, validation, processing, and storage in Firestore
 import functions_framework
 from firebase_functions import https_fn, options
 from firebase_functions.https_fn import Request, Response  # type: ignore
+from google.cloud.firestore import Query
 from firebase_admin import initialize_app, firestore, auth
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, cast
 import logging
 import json
 from pydantic import BaseModel, ValidationError, Field
@@ -16,6 +17,7 @@ from pydantic import BaseModel, ValidationError, Field
 # Initialize Firebase Admin
 initialize_app()
 db = firestore.client()
+SERVER_TIMESTAMP = cast(Any, getattr(firestore, "SERVER_TIMESTAMP", None))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,12 +50,12 @@ def validate_device_api_key(device_id: str, api_key: str) -> Tuple[bool, str]:
     Returns: (is_valid, user_id)
     """
     try:
-        device_doc = db.collection("devices").document(device_id).get()
+        device_doc = cast(Any, db.collection("devices").document(device_id).get())
         
-        if not device_doc.exists():
+        if device_doc is None or not getattr(device_doc, "exists", False):
             return False, "Device not found"
         
-        device_data = device_doc.to_dict()
+        device_data = device_doc.to_dict() or {}
         
         # In production, use secure key hashing. For now, simple comparison
         if device_data.get("api_key") != api_key:
@@ -62,7 +64,7 @@ def validate_device_api_key(device_id: str, api_key: str) -> Tuple[bool, str]:
         if device_data.get("status") != "active":
             return False, "Device is not active"
         
-        return True, device_data.get("user_id")
+        return True, cast(str, device_data.get("user_id") or "unknown")
     
     except Exception as e:
         logger.error(f"Auth validation error: {str(e)}")
@@ -73,9 +75,11 @@ def validate_device_api_key(device_id: str, api_key: str) -> Tuple[bool, str]:
 def get_carbon_rates() -> Dict[str, Any]:
     """Fetches carbon conversion rates from Firestore"""
     try:
-        rates_doc = db.collection("carbon_rates").document("default").get()
-        if rates_doc.exists:
-            return rates_doc.to_dict()
+        rates_doc = cast(Any, db.collection("carbon_rates").document("default").get())
+        if getattr(rates_doc, "exists", False):
+            data = rates_doc.to_dict() or {}
+            if data:
+                return data
         
         # Return defaults if not found
         return {
@@ -136,7 +140,7 @@ def calculate_daily_carbon_contribution(
 # ==================== CLOUD FUNCTIONS ====================
 
 @https_fn.on_request(max_instances=20)
-def receive_sensor_data(req: https_fn.Request) -> https_fn.Response:
+def receive_sensor_data(req: Request) -> Response:
     """
     HTTP endpoint: POST /receiveSensorData
     Receives sensor data from Arduino/ESP32, validates, and stores in Firestore
@@ -203,7 +207,7 @@ def receive_sensor_data(req: https_fn.Request) -> https_fn.Response:
             "co2_level": validated_data.co2_level,
             "battery": validated_data.battery,
             "rssi": validated_data.rssi,
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": SERVER_TIMESTAMP,
             "received_at": datetime.now(timezone.utc),
             "processed": False
         }
@@ -219,7 +223,7 @@ def receive_sensor_data(req: https_fn.Request) -> https_fn.Response:
         
         # Update device last_heartbeat
         db.collection("devices").document(validated_data.device_id).update({
-            "last_heartbeat": firestore.SERVER_TIMESTAMP,
+            "last_heartbeat": SERVER_TIMESTAMP,
             "status": "active"
         })
         
@@ -290,9 +294,18 @@ def calculate_daily_summary(req: Request) -> Response:
     headers = {'Access-Control-Allow-Origin': '*'}
     
     try:
-        request_data = req.get_json()
+        request_data = req.get_json() or {}
         device_id = request_data.get("device_id")
         date_str = request_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+        if not device_id:
+            return Response(
+                json.dumps({"error": "device_id is required"}),
+                status=400,
+                headers=headers,
+                mimetype="application/json"
+            )
+        device_id = cast(str, device_id)
         
         # Parse date
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -310,7 +323,9 @@ def calculate_daily_summary(req: Request) -> Response:
         for doc in query:
             reading_time = doc.get("timestamp")
             if reading_time and reading_time.date() == target_date:
-                readings.append(doc.to_dict())
+                reading = doc.to_dict() or {}
+                if reading:
+                    readings.append(reading)
         
         if not readings:
             return Response(
@@ -355,7 +370,7 @@ def calculate_daily_summary(req: Request) -> Response:
                 avg_temperature=sum(temps) / len(temps),
                 avg_soil_moisture=sum(moistures) / len(moistures)
             ),
-            "created_at": firestore.SERVER_TIMESTAMP
+            "created_at": SERVER_TIMESTAMP
         }
         
         # Write summary to Firestore
@@ -405,17 +420,19 @@ def get_device_summary(req: Request) -> Response:
                 headers=headers,
                 mimetype="application/json"
             )
+        device_id = cast(str, device_id)
         
         # Query daily summaries
         summaries = db.collection("daily_summaries").document(device_id).collection(
             "summaries"
-        ).order_by("date_key", direction=firestore.Query.DESCENDING).limit(days).stream()
+        ).order_by("date_key", direction=Query.DESCENDING).limit(days).stream()
         
         results = []
         for doc in summaries:
+            doc_data = doc.to_dict() or {}
             results.append({
                 "date": doc.id,
-                "data": doc.to_dict()
+                "data": doc_data
             })
         
         return Response(
@@ -439,7 +456,7 @@ def get_device_summary(req: Request) -> Response:
         )
 
 @https_fn.on_request()
-def health_check(req: https_fn.Request) -> https_fn.Response:
+def health_check(req: Request) -> Response:
     """Simple health check endpoint"""
     return Response(
         json.dumps({
@@ -453,7 +470,7 @@ def health_check(req: https_fn.Request) -> https_fn.Response:
     )
 
 @https_fn.on_request()
-def identify_tree_species(req: https_fn.Request) -> https_fn.Response:
+def identify_tree_species(req: Request) -> Response:
     """
     HTTP endpoint: POST /identifyTreeSpecies
     Identifies tree species from bark image using ResNet50 model
@@ -471,7 +488,7 @@ def identify_tree_species(req: https_fn.Request) -> https_fn.Response:
     headers = {'Access-Control-Allow-Origin': '*'}
     
     try:
-        data = req.get_json()
+        data = req.get_json() or {}
         device_id = data.get("device_id")
         image_url = data.get("image_url")
         location = data.get("location", {})
@@ -483,10 +500,12 @@ def identify_tree_species(req: https_fn.Request) -> https_fn.Response:
                 headers=headers,
                 mimetype="application/json"
             )
+        device_id = cast(str, device_id)
+        image_url = cast(str, image_url)
         
         # Verify device exists
-        device_doc = db.collection("devices").document(device_id).get()
-        if not device_doc.exists():
+        device_doc = cast(Any, db.collection("devices").document(device_id).get())
+        if device_doc is None or not getattr(device_doc, "exists", False):
             return Response(
                 json.dumps({"error": "Device not found"}),
                 status=404,
@@ -494,14 +513,17 @@ def identify_tree_species(req: https_fn.Request) -> https_fn.Response:
                 mimetype="application/json"
             )
         
-        device_data = device_doc.to_dict()
-        user_id = device_data.get("user_id")
+        device_data = device_doc.to_dict() or {}
+        user_id = cast(str, device_data.get("user_id") or "unknown")
         
         # Load ML model and identify tree
         from ml_inference import get_identifier
         identifier = get_identifier()
         
         result = identifier.identify(image_url)
+        confidence = float(result.get("confidence") or 0.0)
+        species = cast(str, result.get("species") or "unknown")
+        carbon_rate = float(result.get("carbon_rate_kg_per_month") or 0.0)
         
         if not result.get("success"):
             log_activity(
@@ -522,14 +544,14 @@ def identify_tree_species(req: https_fn.Request) -> https_fn.Response:
         tree_doc = {
             "device_id": device_id,
             "user_id": user_id,
-            "species": result.get("species"),
-            "confidence": result.get("confidence"),
-            "confidence_level": identifier.get_confidence_level(result.get("confidence")),
+            "species": species,
+            "confidence": confidence,
+            "confidence_level": identifier.get_confidence_level(confidence),
             "class_id": result.get("class_id"),
-            "carbon_rate_kg_per_month": result.get("carbon_rate_kg_per_month"),
+            "carbon_rate_kg_per_month": carbon_rate,
             "image_url": image_url,
             "location": location,
-            "identified_at": firestore.SERVER_TIMESTAMP,
+            "identified_at": SERVER_TIMESTAMP,
             "model_version": "ResNet50-BarkVisionAI",
             "processing_time_ms": 0
         }
@@ -550,11 +572,11 @@ def identify_tree_species(req: https_fn.Request) -> https_fn.Response:
             json.dumps({
                 "success": True,
                 "tree_id": tree_id,
-                "species": result.get("species"),
-                "confidence": result.get("confidence"),
-                "confidence_level": identifier.get_confidence_level(result.get("confidence")),
-                "carbon_rate_kg_per_month": result.get("carbon_rate_kg_per_month"),
-                "message": f"Tree identified as {result.get('species')} with {result.get('confidence'):.1%} confidence"
+                "species": species,
+                "confidence": confidence,
+                "confidence_level": identifier.get_confidence_level(confidence),
+                "carbon_rate_kg_per_month": carbon_rate,
+                "message": f"Tree identified as {species} with {confidence:.1%} confidence"
             }),
             status=201,
             headers=headers,
@@ -575,10 +597,10 @@ def identify_tree_species(req: https_fn.Request) -> https_fn.Response:
 def log_activity(
     user_id: str,
     action: str,
-    device_id: str = None,
+    device_id: Optional[str] = None,
     status: str = "success",
     error_message: Optional[str] = None,
-    metadata: Dict = None
+    metadata: Optional[Dict[str, Any]] = None
 ) -> None:
     """Log activity to Firestore for auditing"""
     try:
@@ -588,7 +610,7 @@ def log_activity(
             "device_id": device_id,
             "status": status,
             "error_message": error_message,
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": SERVER_TIMESTAMP,
             "metadata": metadata or {}
         }
         

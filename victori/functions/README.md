@@ -9,11 +9,19 @@ Welcome to the HCCMS Backend implementation! All Cloud Functions, database schem
 2. **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Step-by-step Firebase setup and deployment
 3. **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API endpoint specifications
 
+### 🤖 ML Model Deployment (Alternative Approach)
+4. **[INFERENCE_SERVER_DEPLOYMENT.md](INFERENCE_SERVER_DEPLOYMENT.md)** - Flask server for free-tier tree identification
+   - Deploy to Railway, Render, or Replit (no Firebase Blaze plan required)
+   - Perfect for tree species classification via VGG16 model
+   - Complete with API docs, integration guide, and troubleshooting
+
 ### 📋 Technical Reference
-4. **[firestore_schema.md](firestore_schema.md)** - Database structure and collections
-5. **[main.py](main.py)** - Cloud Functions source code (4 HTTP endpoints)
-6. **[init_firestore.py](init_firestore.py)** - Firestore initialization script
-7. **[requirements.txt](requirements.txt)** - Python dependencies
+5. **[firestore_schema.md](firestore_schema.md)** - Database structure and collections
+6. **[main.py](main.py)** - Cloud Functions source code (4 HTTP endpoints)
+7. **[inference_server.py](inference_server.py)** - Flask ML inference server (alternative deployment)
+8. **[init_firestore.py](init_firestore.py)** - Firestore initialization script
+9. **[requirements.txt](requirements.txt)** - Python dependencies for Cloud Functions
+10. **[requirements_inference.txt](requirements_inference.txt)** - Python dependencies for Flask server
 
 ---
 
@@ -200,6 +208,49 @@ python init_firestore.py
 - Security rules for access control
 - Index recommendations
 - Data flow examples
+
+### inference_server.py
+**Flask REST API for VGG16 tree identification (Free-tier alternative)**
+- Lightweight Python Flask application
+- VGG16 deep learning model for 2-class tree classification
+- Supports both file upload and image URL inference
+- CORS enabled for cross-origin frontend requests
+- 3 endpoints: /health, /classes, /identify
+
+**Key Functions:**
+```python
+@app.route('/identify', methods=['POST'])
+def identify_tree()  # ← Tree classification endpoint
+
+@app.route('/health', methods=['GET'])
+def health_check()  # ← Service health status
+
+@app.route('/classes', methods=['GET'])
+def get_classes()  # ← List supported tree classes
+```
+
+**Why This Over Cloud Functions?**
+- Firebase Cloud Functions require Blaze (pay-as-you-go) plan
+- This Flask server runs on free-tier services (Railway, Render, Replit)
+- Same ML model (VGG16), different deployment strategy
+- Can be deployed alongside Firebase for hybrid architecture
+
+### INFERENCE_SERVER_DEPLOYMENT.md
+**Complete deployment guide for Flask inference server**
+- Local development setup
+- API endpoint documentation with cURL examples
+- 4 deployment options (Railway, Render, Replit, Ngrok)
+- Firebase integration instructions
+- Performance benchmarks
+- Troubleshooting guide
+- Production scaling recommendations
+
+**Supported Platforms:**
+- Railway.app (recommended, $5/month free tier)
+- Render.com (free tier with 15-min sleep)
+- Replit.com (instant deployment, auto URL)
+- Local with Ngrok (development/testing)
+- AWS Lambda, Google Cloud Run (advanced)
 
 ### API_DOCUMENTATION.md
 **Full API reference for developers**
