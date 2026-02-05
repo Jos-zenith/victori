@@ -107,12 +107,12 @@ export function HeroMetric() {
       <CarbonGauge value={credits} max={5000} />
 
       {/* Breakdown */}
-      <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-border">
-        <div className="text-center">
+      <div className="flex gap-4 mt-8 pt-8 border-t border-border">
+        <div className="flex-1 text-center">
           <p className="text-xs text-muted-foreground mb-1">Tree Absorption</p>
           <p className="text-xl font-semibold text-accent">+$3,240.50</p>
         </div>
-        <div className="text-center">
+        <div className="flex-1 text-center">
           <p className="text-xs text-muted-foreground mb-1">
             Vehicle Emission
           </p>

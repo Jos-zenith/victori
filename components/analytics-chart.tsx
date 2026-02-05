@@ -40,9 +40,9 @@ export function AnalyticsChart() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="flex flex-col lg:flex-row gap-8">
         {/* Bar Chart */}
-        <div className="rounded-lg bg-background p-4">
+        <div className="flex-1 rounded-lg bg-background p-4">
           <h3 className="text-sm font-medium text-foreground mb-4">
             Absorption vs Footprint
           </h3>
@@ -66,7 +66,7 @@ export function AnalyticsChart() {
         </div>
 
         {/* Line Chart - Net Credits */}
-        <div className="rounded-lg bg-background p-4">
+        <div className="flex-1 rounded-lg bg-background p-4">
           <h3 className="text-sm font-medium text-foreground mb-4">
             Net Credit Trend
           </h3>
@@ -96,16 +96,16 @@ export function AnalyticsChart() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
-        <div className="text-center">
+      <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-border sm:flex-row sm:gap-4">
+        <div className="flex-1 text-center">
           <p className="text-xs text-muted-foreground mb-1">Avg Monthly Absorption</p>
           <p className="text-xl font-bold text-accent">2,768 kg CO₂</p>
         </div>
-        <div className="text-center">
+        <div className="flex-1 text-center">
           <p className="text-xs text-muted-foreground mb-1">Avg Monthly Footprint</p>
           <p className="text-xl font-bold text-destructive">1,192 kg CO₂</p>
         </div>
-        <div className="text-center">
+        <div className="flex-1 text-center">
           <p className="text-xs text-muted-foreground mb-1">Annual Net Credit</p>
           <p className="text-xl font-bold text-primary">18,912 kg CO₂</p>
         </div>

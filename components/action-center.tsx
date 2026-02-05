@@ -41,8 +41,8 @@ export function ActionCenter() {
       </div>
 
       {/* Info Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-primary-200">
-        <div className="bg-white rounded-lg p-4">
+      <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-primary-200 sm:flex-row">
+        <div className="flex-1 bg-white rounded-lg p-4">
           <p className="text-xs font-semibold text-primary-700 mb-2">
             SYNC STATUS
           </p>
@@ -50,7 +50,7 @@ export function ActionCenter() {
           <p className="text-xs text-muted-foreground">Updated 2 min ago</p>
         </div>
 
-        <div className="bg-white rounded-lg p-4">
+        <div className="flex-1 bg-white rounded-lg p-4">
           <p className="text-xs font-semibold text-accent mb-2">
             CREDITS EARNED
           </p>
@@ -58,7 +58,7 @@ export function ActionCenter() {
           <p className="text-xs text-muted-foreground">This month</p>
         </div>
 
-        <div className="bg-white rounded-lg p-4">
+        <div className="flex-1 bg-white rounded-lg p-4">
           <p className="text-xs font-semibold text-primary-700 mb-2">
             CERTIFICATES
           </p>
