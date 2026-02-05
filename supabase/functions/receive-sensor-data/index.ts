@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Insert sensor reading
+    // Insert sensor reading with tree data stored in metadata
     const { data: reading, error: insertError } = await supabase
       .from('sensor_readings')
       .insert({
@@ -101,12 +101,15 @@ Deno.serve(async (req: Request) => {
         timestamp: new Date().toISOString(),
         received_at: new Date().toISOString(),
         processed: false,
-        // Tree measurement data
-        tree_dbh: data.dbh,
-        tree_height: data.tree_height,
-        co2_emitted_ppm: data.co2_emitted_ppm,
-        co2_absorbed_ppm: data.co2_absorbed_ppm,
-        o2_released_ppm: data.o2_released_ppm,
+        // Store tree measurement data in JSON metadata
+        metadata: {
+          tree_dbh: data.dbh,
+          tree_height: data.tree_height,
+          co2_emitted_ppm: data.co2_emitted_ppm,
+          co2_absorbed_ppm: data.co2_absorbed_ppm,
+          o2_released_ppm: data.o2_released_ppm,
+          tree_species: data.tree_species,
+        }
       })
       .select()
       .single();

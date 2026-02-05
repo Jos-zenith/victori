@@ -94,15 +94,16 @@ const subscribeToSensorData = async () => {
         },
         (payload) => {
           const newReading = payload.new as any
+          const metadata = newReading.metadata || {}
           realtimeSensorData.value = {
             temperature: newReading.temperature,
             humidity: newReading.humidity,
             light_intensity: newReading.light_intensity,
-            co2_emitted_ppm: newReading.co2_emitted_ppm || 420,
-            co2_absorbed_ppm: newReading.co2_absorbed_ppm || 0,
-            o2_released_ppm: newReading.o2_released_ppm || 0,
-            tree_dbh: newReading.tree_dbh,
-            tree_height: newReading.tree_height,
+            co2_emitted_ppm: metadata.co2_emitted_ppm || 420,
+            co2_absorbed_ppm: metadata.co2_absorbed_ppm || 0,
+            o2_released_ppm: metadata.o2_released_ppm || 0,
+            tree_dbh: metadata.tree_dbh,
+            tree_height: metadata.tree_height,
           }
           
           // Update calculated values
