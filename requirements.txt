@@ -1,0 +1,7 @@
+# Python dependencies for victori Flask inference server
+# Install from victori/functions/requirements_inference.txt
+Flask==3.1.2
+Flask-CORS==6.0.2
+torch==2.10.0
+torchvision==0.25.0
+Pillow==11.3.0
