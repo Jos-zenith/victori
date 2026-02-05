@@ -5,7 +5,7 @@ services:
     runtime: python
     pythonVersion: 3.11
     plan: free
-    buildCommand: python -m pip install -r victori/functions/requirements_inference.txt
+    buildCommand: python -m pip install -r requirements.txt
     startCommand: python victori/functions/inference_server.py
     envVars:
       - key: FLASK_ENV

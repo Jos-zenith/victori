@@ -1,8 +1,7 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "python -m pip install -r victori/functions/requirements_inference.txt"
+    "builder": "NIXPACKS"
   },
   "deploy": {
     "startCommand": "python victori/functions/inference_server.py",
