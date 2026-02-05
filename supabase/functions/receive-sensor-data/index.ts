@@ -18,6 +18,13 @@ interface SensorData {
   co2_level?: number;
   battery?: number;
   rssi?: number;
+  // Tree measurement data (from ESP32)
+  dbh?: number;  // Diameter at Breast Height in cm
+  tree_height?: number;  // Tree height in meters
+  co2_emitted_ppm?: number;  // CO2 from cars in ppm
+  co2_absorbed_ppm?: number;  // CO2 absorbed by trees in ppm
+  o2_released_ppm?: number;  // O2 released by trees in ppm
+  tree_species?: string;  // Identified tree species
 }
 
 Deno.serve(async (req: Request) => {
@@ -94,6 +101,12 @@ Deno.serve(async (req: Request) => {
         timestamp: new Date().toISOString(),
         received_at: new Date().toISOString(),
         processed: false,
+        // Tree measurement data
+        tree_dbh: data.dbh,
+        tree_height: data.tree_height,
+        co2_emitted_ppm: data.co2_emitted_ppm,
+        co2_absorbed_ppm: data.co2_absorbed_ppm,
+        o2_released_ppm: data.o2_released_ppm,
       })
       .select()
       .single();

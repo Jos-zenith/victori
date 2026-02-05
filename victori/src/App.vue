@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { createClient } from '@supabase/supabase-js'
 
 // UI State
 const sidebarOpen = ref(true)
@@ -10,16 +11,159 @@ const isIdentifying = ref(false)
 const errorMessage = ref('')
 const selectedSpecies = ref<{name: string, confidence: number, co2_monthly: number} | null>(null)
 
+// Real-time sensor data
+const realtimeSensorData = ref<{
+  temperature: number
+  humidity: number
+  light_intensity: number
+  co2_emitted_ppm: number
+  co2_absorbed_ppm: number
+  o2_released_ppm: number
+  tree_dbh?: number
+  tree_height?: number
+} | null>(null)
+
 // Dashboard metrics
 const totalTrees = ref(5)
 const totalCO2Offset = ref(2450.8)
 const monthlyTarget = ref(500)
 const currentMonth = ref(245.5)
+const chaveCalculatedCO2 = ref(0)
+const healthScore = ref(0)
+
 const lastIdentifications = ref<Array<{id: number, species: string, confidence: number, date: string}>>([
   { id: 1, species: 'Mango Tree', confidence: 94, date: '2 hours ago' },
   { id: 2, species: 'Coconut Tree', confidence: 89, date: '5 hours ago' },
   { id: 3, species: 'Mango Tree', confidence: 91, date: '1 day ago' }
 ])
+
+// Supabase client
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co',
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
+)
+
+// Chave equation calculation
+const calculateChaveCarbon = (temperature: number, humidity: number, lightIntensity: number, dbh?: number, height?: number): number => {
+  if (!dbh || dbh <= 0) return 0
+  
+  // Simplified Chave equation: AGB = 0.0919 × (ρ × DBH² × H)^0.906
+  const woodDensity = 0.60 // Default wood density
+  const h = height || 20 // Default height if not provided
+  const agb = 0.0919 * Math.pow(woodDensity * dbh * dbh * h, 0.906)
+  
+  // Carbon content (47% of dry biomass)
+  const carbon = agb * 0.47
+  
+  // CO2 equivalent (3.67 conversion factor)
+  return carbon * 3.67 / 12 // Monthly value
+}
+
+// Calculate tree health score
+const calculateHealthScore = (temp: number, humidity: number, lightIntensity: number): number => {
+  const optimalTemp = 25
+  const tempFactor = 1 - Math.abs(temp - optimalTemp) / 40
+  const humidityFactor = 1 - Math.abs(humidity - 70) / 50
+  const lightFactor = 1 - Math.abs(lightIntensity - 800) / 1000
+  
+  return Math.max(0, Math.min(1, (Math.max(0, tempFactor) + Math.max(0, humidityFactor) + Math.max(0, lightFactor)) / 3))
+}
+
+// Setup real-time Supabase subscriptions
+onMounted(() => {
+  subscribeToSensorData()
+  subscribeToTreeIdentifications()
+})
+
+onUnmounted(() => {
+  // Cleanup subscriptions
+  supabase.removeAllChannels()
+})
+
+const subscribeToSensorData = async () => {
+  try {
+    // Subscribe to latest sensor readings
+    const channel = supabase
+      .channel('sensor_readings_live')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sensor_readings',
+        },
+        (payload) => {
+          const newReading = payload.new as any
+          realtimeSensorData.value = {
+            temperature: newReading.temperature,
+            humidity: newReading.humidity,
+            light_intensity: newReading.light_intensity,
+            co2_emitted_ppm: newReading.co2_emitted_ppm || 420,
+            co2_absorbed_ppm: newReading.co2_absorbed_ppm || 0,
+            o2_released_ppm: newReading.o2_released_ppm || 0,
+            tree_dbh: newReading.tree_dbh,
+            tree_height: newReading.tree_height,
+          }
+          
+          // Update calculated values
+          if (realtimeSensorData.value) {
+            const co2Monthly = calculateChaveCarbon(
+              realtimeSensorData.value.temperature,
+              realtimeSensorData.value.humidity,
+              realtimeSensorData.value.light_intensity,
+              realtimeSensorData.value.tree_dbh,
+              realtimeSensorData.value.tree_height
+            )
+            chaveCalculatedCO2.value = co2Monthly
+            
+            healthScore.value = calculateHealthScore(
+              realtimeSensorData.value.temperature,
+              realtimeSensorData.value.humidity,
+              realtimeSensorData.value.light_intensity
+            )
+            
+            currentMonth.value += co2Monthly
+          }
+        }
+      )
+      .subscribe()
+  } catch (error) {
+    console.error('Error subscribing to sensor data:', error)
+  }
+}
+
+const subscribeToTreeIdentifications = async () => {
+  try {
+    // Subscribe to new tree identifications
+    const channel = supabase
+      .channel('tree_identifications_live')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tree_identifications',
+        },
+        (payload) => {
+          const newId = payload.new as any
+          lastIdentifications.value.unshift({
+            id: Date.now(),
+            species: newId.species,
+            confidence: Math.round(newId.confidence * 100),
+            date: 'Just now',
+          })
+          
+          // Update total CO2
+          const monthlyCarbon = newId.carbon_rate_kg_per_month || 2.0
+          totalCO2Offset.value += monthlyCarbon * 12 // Annual value
+          totalTrees.value += 1
+        }
+      )
+      .subscribe()
+  } catch (error) {
+    console.error('Error subscribing to tree identifications:', error)
+  }
+}
 
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement
@@ -161,6 +305,26 @@ const clearImage = () => {
 
       <!-- Dashboard Page -->
       <section v-if="currentPage === 'dashboard'" class="page">
+        <!-- Real-time Status Banner -->
+        <div v-if="realtimeSensorData" class="realtime-banner">
+          <div class="banner-icon">🔴</div>
+          <div class="banner-content">
+            <h3>Live ESP32 Data</h3>
+            <p>Temperature: {{ realtimeSensorData.temperature }}°C | Humidity: {{ realtimeSensorData.humidity }}% | Light: {{ realtimeSensorData.light_intensity }} µmol/m²/s</p>
+            <p v-if="realtimeSensorData.tree_dbh">DBH: {{ realtimeSensorData.tree_dbh }}cm | Height: {{ realtimeSensorData.tree_height }}m</p>
+          </div>
+          <div class="banner-stats">
+            <div class="stat">
+              <span class="stat-label">Health Score</span>
+              <span class="stat-value">{{ (healthScore * 100).toFixed(0) }}%</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">CO₂ Offset (Monthly)</span>
+              <span class="stat-value">{{ chaveCalculatedCO2.toFixed(2) }} kg</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Key Metrics Row -->
         <div class="metrics-grid">
           <div class="metric-card">
@@ -177,7 +341,7 @@ const clearImage = () => {
               <h3>Total CO₂ Offset</h3>
               <span class="icon">🌍</span>
             </div>
-            <div class="metric-value">{{ totalCO2Offset }} kg</div>
+            <div class="metric-value">{{ totalCO2Offset.toFixed(1) }} kg</div>
             <p class="metric-change">↑ 12% from last month</p>
           </div>
           
@@ -186,7 +350,7 @@ const clearImage = () => {
               <h3>This Month</h3>
               <span class="icon">📈</span>
             </div>
-            <div class="metric-value">{{ currentMonth }} kg</div>
+            <div class="metric-value">{{ currentMonth.toFixed(1) }} kg</div>
             <div class="progress-bar">
               <div class="progress-fill" :style="{ width: (currentMonth / monthlyTarget * 100) + '%' }"></div>
             </div>
@@ -533,6 +697,77 @@ const clearImage = () => {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+}
+
+/* ============ REALTIME BANNER ============ */
+.realtime-banner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: white;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.9; }
+}
+
+.banner-icon {
+  font-size: 2rem;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 49%, 100% { opacity: 1; }
+  50%, 99% { opacity: 0.3; }
+}
+
+.banner-content {
+  flex: 1;
+}
+
+.banner-content h3 {
+  margin: 0 0 5px 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.banner-content p {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.95;
+  line-height: 1.4;
+}
+
+.banner-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  opacity: 0.9;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
 }
 
 /* ============ METRICS GRID ============ */
